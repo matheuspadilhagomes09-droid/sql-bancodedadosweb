@@ -313,3 +313,173 @@ from 'usuario_farmacia'@'localhost';
 
 -- excluiundo usuario
 drop user 'usuario_farmacia'@'localhost';
+
+
+-- procedure: listar protudos de uma farmacia 
+delimiter $$ 
+
+create procedure listar_produtos_farmacia (in cnpjfarm varchar (14)) 
+begin
+select codproduto, quantproduto, valorproduto
+from produto
+where cnpj_farmacia = cnpjfarm;
+end$$
+
+delimiter ;
+
+-- executando o procedure
+call listar_produtos_farmacia ('12345678000199');
+
+--procedure: atualizar o valor do produto
+delimiter $$
+
+create procedure atualizar_valor_produto (
+  in p_cod int,
+  in p_valor DECIMAL (10,2)
+)
+begin 
+   update produto
+   set valorproduto = p_valor 
+     where codproduto = p_cod;
+     END$$
+
+     delimiter ;
+
+     -- executando o procedure acima
+     call atualizar_valor_produto(1, 19.90);
+     
+     --function: calcular o valor total em estoque
+     delimiter $$
+     create function valor_total_produto (p_cod int)
+     returns decimal (10,2)
+     deterministic
+     begin
+
+     declare total decimal (10,2);
+
+     select quantproduto * valorproduto
+     into total 
+     from produto
+     where codproduto = p_cod;
+
+     return total;
+     end$$
+
+     delimiter ;
+
+     -- usando a funçao acima
+     select valor_total_produto(1) as total_em_estoque;
+
+
+     -- function: quantidade de produtos por farmacia 
+     delimiter $$
+     create function qtd_produtos_farmacia(p_cnpj varchar(14))
+     returns int 
+     deterministic
+     begin
+     declare total int;
+
+  
+     select count(*)
+     into total
+     from produto
+     where cnpj_farmacia = p_cnpj;
+
+     return total;
+     end$$
+
+     delimiter ;
+
+     -- executando a funçao acima
+     select qtd_produtos_farmacia('12345678000199');
+
+-- funçao de soma
+delimiter $$
+drop function if exists qtd_produtos_farmacia $$
+ create function qtd_produtos_farmacia (p_cnpj varchar(14))
+returns int
+deterministic
+begin
+declare total int;
+
+select sum(quantproduto)
+into total
+from produto
+where cnpj_farmacia = p_cnpj;
+
+return total;
+end$$
+
+delimiter ;
+
+-- testando a funçao acima
+select qtd_produtos_farmacia('12345678000199') as total_em_estoque;
+
+-- trigger: impedir quantidade negativa (before insert)
+delimiter $$
+
+create trigger trg_before_insert_produto
+before insert on produto
+for each row
+begin
+if new.quantproduto< < 0 then
+set new.quantproduto = 0;
+end if;
+end$$
+
+delimiter ;
+     
+     -- tentando inserir um valor negativo
+     insert into produto (quantproduto, valorproduto, cnpj_farmacia)
+     values (-10, 20.00, '12345678000199');
+
+
+     -- trigger impedir valor negativo (before uptade)
+     delimiter $$
+
+     create trigger trg_before_update_produto
+     before update on produto
+     for each row
+     begin
+     if new.valorproduto < 0 then
+     set new.valorproduto = old.valorproduto;
+     end if;
+     end$$
+
+     delimiter ;
+
+     -- testando o codigo acima 
+     update produto
+     set valorproduto = -25.00
+     where codproduto = 1;
+
+     -- view: farmácia + produto
+     create view vw_farmacia_produto as
+     select 
+     f.nomefarmacia,
+     f.cidade,
+     p.codproduto,
+     p.quantproduto,
+     p.valorproduto
+     from farmacia f
+     inner join produto p 
+     on f.cnpj = p.cnpj_farmacia;
+
+     -- testando o codigo acima
+     select * from vw_farmacia_produto;
+
+     --view : farmacia + farmaceutico
+    create view vw_farmaceutico_farmacia as
+    select 
+    fa.nomefarmacia,
+    fa.cidade,
+    fm.nomefarmaceutico
+    from farmacia fa
+    inner join farmaceutico fm
+    on fa.cnpj = fm.cnpj_farmacia;
+
+    -- criando uma nova view
+    create view vw_produtos_caros as
+    select *
+    from produto
+    where valorproduto > 30;
